@@ -41,8 +41,7 @@ app.post('/', function(req, res, next) {
             databaseURL: process.env.DATABASE,
             serviceAccount: process.env.SERVICEACCOUNTFILE,
             databaseAuthVariableOverride: {
-              device_id : body.device_id,
-              access_token : body.access_token
+              device_id : body.device_id
             }
           }, body.device_id);
         }
