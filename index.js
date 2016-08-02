@@ -17,7 +17,6 @@ app.post('/', function(req, res, next) {
     var body = req.body;
     // Verify request has all fields
     var properties = ['device_id', 'access_token', 'event_type', 'firebase_path'];
-
     for (var index in properties) {
       if (!body.hasOwnProperty(properties[index])) {
         console.log("Malformed request", body);
@@ -32,50 +31,66 @@ app.post('/', function(req, res, next) {
       res.status(400).send("Invalid Firebase event_type: " + body.event_type);
     }
 
-    if (!firebaseApps.hasOwnProperty(body.device_id)) {
-      firebaseApps[body.device_id] = firebase.initializeApp({
-        databaseURL: process.env.DATABASE,
-        serviceAccount: process.env.SERVICEACCOUNTFILE,
-        databaseAuthVariableOverride: {
-          device_id : body.device_id,
-          access_token : body.access_token
+    // check access token
+    var devicesPr = particle.getDevice({ deviceId : body.device_id, auth: body.access_token });
+    devicesPr.then(
+      function(data) {
+        // successfully got device, attach Firebase listener
+        if (!firebaseApps.hasOwnProperty(body.device_id)) {
+          firebaseApps[body.device_id] = firebase.initializeApp({
+            databaseURL: process.env.DATABASE,
+            serviceAccount: process.env.SERVICEACCOUNTFILE,
+            databaseAuthVariableOverride: {
+              device_id : body.device_id,
+              access_token : body.access_token
+            }
+          }, body.device_id);
         }
-      }, body.device_id);
-    }
-    var fb = firebaseApps[body.device_id];
+        var fb = firebaseApps[body.device_id];
 
-    // The app only has access as defined in the Security Rules
-    var db = fb.database();
+        // The app only has access as defined in the Security Rules
+        var db = fb.database();
 
-    var ref = db.ref(body.firebase_path);
+        var ref = db.ref(body.firebase_path);
 
-    var promise = ref.once('value',
-      function(snapshot) {
-        // console.log("Successfully retrieved value at path: ", snapshot.val());
-        res.status(200).send("OK");
-        // no errors in retrieving value -- kludge in absence of ref.on success feedback
-        // go ahead and attach event listener
-        ref.on(body.event_type,
+        var promise = ref.once('value',
           function(snapshot) {
-            // firebase event fired -- publish an event to the device with the data, could be null if bad path
-            console.log("Event fired: ", snapshot.val());
-            //console.log("snapshot", snapshot.val());
+            // console.log("Successfully retrieved value at path: ", snapshot.val());
+            // no errors in retrieving value -- kludge in absence of ref.on success feedback
+            // go ahead and attach event listener
+            ref.on(body.event_type,
+              function(snapshot) {
+                // firebase event fired -- publish an event to the device with the data, could be null if bad path
+                console.log("Event fired: ", snapshot.val());
+                //console.log("snapshot", snapshot.val());
+              },
+              function(error) {
+                // cancel event -- publish something to the device
+                console.log("attach cancel", error);
+              }
+            );
+
+            // made it this far without exceptions, go ahead and send status 200
+            res.status(200).send("OK");
           },
           function(error) {
-            // cancel event -- publish something to the device
+            if (error.message.indexOf("permission_denied") > -1) {
+              // give a 403
+              // console.log("Permission Denied: ", error.message);
+              res.status(403).send("Firebase permission denied: " + error.message);
+              return;
+            }
+            res.status(503).send("Firebase error: " + error.message);
+            // unhandled error?
           }
         );
 
       },
       function(error) {
-        if (error.message.indexOf("permission_denied") > -1) {
-          // give a 403
-          // console.log("Permission Denied: ", error.message);
-          res.status(403).send("Firebase permission denied: " + error.message);
-          return;
-        }
-        res.status(503).send("Firebase error: " + error.message);
-        // unhandled error?
+        // Couldn't validate device_id and access_token
+        // console.log(error);
+        res.status(error.statusCode);
+        res.send(error.body.error);
       }
     );
   } catch(error) {
