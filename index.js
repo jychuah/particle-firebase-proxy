@@ -11,6 +11,7 @@ app.use(bodyParser.json());
 var particle = new Particle();
 
 var firebaseApps = { };
+var particleStreams = { };
 
 app.post('/', function(req, res, next) {
   try {
@@ -32,9 +33,26 @@ app.post('/', function(req, res, next) {
     }
 
     // check access token
-    var devicesPr = particle.getDevice({ deviceId : body.device_id, auth: body.access_token });
+    var devicesPr = particle.getEventStream({ deviceId : body.device_id, auth: body.access_token });
     devicesPr.then(
-      function(data) {
+      function(stream) {
+        particleStreams[body.device_id] = stream;
+        stream.on('event', function(data) {
+          // if device went offline, end streams, delete firebase app, delete references
+          if (data.data === 'offline') {
+            try {
+              particleStreams[body.device_id].end();
+              delete particleStreams[body.device_id];
+              firebaseApps[body.device_id].delete().then(function() {
+                delete firebaseApps[body.device_id];
+                console.log("Released resources for device: ", body.device_id);
+              });
+            } catch (error) {
+              console.error(error);
+            }
+          }
+        });
+
         // successfully got device, attach Firebase listener
         if (!firebaseApps.hasOwnProperty(body.device_id)) {
           firebaseApps[body.device_id] = firebase.initializeApp({
@@ -88,6 +106,8 @@ app.post('/', function(req, res, next) {
       function(error) {
         // Couldn't validate device_id and access_token
         // console.log(error);
+        delete particleStreams[body.device_id];
+
         res.status(error.statusCode);
         res.send(error.body.error);
       }
