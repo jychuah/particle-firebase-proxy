@@ -78,12 +78,18 @@ app.post('/', function(req, res, next) {
             ref.on(body.event_type,
               function(snapshot) {
                 // firebase event fired -- publish an event to the device with the data, could be null if bad path
-                console.log("Event fired: ", snapshot.val());
-                //console.log("snapshot", snapshot.val());
+                var payload = { };
+                payload.key = snapshot.key;
+                payload.firebase_path = body.firebase_path;
+                payload.val = snapshot.val();
+                payload.event_type = body.event_type;
+                var privacy = body.isPrivate || false;
+                var publishEventPr = particle.publishEvent({ name: "firebase", data: payload, auth: body.access_token, isPrivate : privacy });
               },
               function(error) {
                 // cancel event -- publish something to the device
-                console.log("attach cancel", error);
+                var privacy = body.isPrivate || false;
+                var publishEventPr = particle.publishEvent({ name: "firebase", data: error, auth: body.access_token, isPrivate : privacy });                
               }
             );
 
