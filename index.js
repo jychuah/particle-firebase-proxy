@@ -48,28 +48,38 @@ app.post('/', function(req, res, next) {
     var db = fb.database();
 
     var ref = db.ref(body.firebase_path);
-    //var ref = db.ref(body.firebase_path);
 
-    ref.on(body.event_type,
+    var promise = ref.once('value',
       function(snapshot) {
-        // firebase event fired -- publish an event to the device with the data, could be null if bad path
-        console.log("snapshot", snapshot.val());
+        // console.log("Successfully retrieved value at path: ", snapshot.val());
+        res.status(200).send("OK");
+        // no errors in retrieving value -- kludge in absence of ref.on success feedback
+        // go ahead and attach event listener
+        ref.on(body.event_type,
+          function(snapshot) {
+            // firebase event fired -- publish an event to the device with the data, could be null if bad path
+            console.log("Event fired: ", snapshot.val());
+            //console.log("snapshot", snapshot.val());
+          },
+          function(error) {
+            // cancel event -- publish something to the device
+          }
+        );
+
       },
       function(error) {
-        // cancel event -- publish something to the device
-        if (error.message.indexOf("permission_denied")) {
-          // permission error
+        if (error.message.indexOf("permission_denied") > -1) {
+          // give a 403
+          // console.log("Permission Denied: ", error.message);
+          res.status(403).send("Firebase permission denied: " + error.message);
           return;
         }
-        console.log(error.message);
-        // unhandled error at this point
+        res.status(503).send("Firebase error: " + error.message);
+        // unhandled error?
       }
     );
-
-    res.status(200).send("OK");
   } catch(error) {
-    res.status(500);
-    res.send("Oops! An unhandled exception occurred: " + error);
+    res.status(500).send("Oops! An unhandled particle-firebase-proxy exception occurred: " + error);
   }
 });
 
