@@ -32,7 +32,7 @@ app.post('/', function(req, res, next) {
       res.status(400).send("Invalid Firebase event_type: " + body.event_type);
     }
 
-    if (!firebaseApps.hasOwnProperty(req.device_id)) {
+    if (!firebaseApps.hasOwnProperty(body.device_id)) {
       firebaseApps[body.device_id] = firebase.initializeApp({
         databaseURL: process.env.DATABASE,
         serviceAccount: process.env.SERVICEACCOUNTFILE,
@@ -46,13 +46,23 @@ app.post('/', function(req, res, next) {
 
     // The app only has access as defined in the Security Rules
     var db = fb.database();
+
     var ref = db.ref(body.firebase_path);
-    var promise = ref.on(body.event_type,
+    //var ref = db.ref(body.firebase_path);
+
+    ref.on(body.event_type,
       function(snapshot) {
-        //
+        // firebase event fired -- publish an event to the device with the data, could be null if bad path
+        console.log("snapshot", snapshot.val());
       },
       function(error) {
-        // cancel event
+        // cancel event -- publish something to the device
+        if (error.message.indexOf("permission_denied")) {
+          // permission error
+          return;
+        }
+        console.log(error.message);
+        // unhandled error at this point
       }
     );
 
