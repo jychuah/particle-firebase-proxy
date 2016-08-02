@@ -1,0 +1,27 @@
+{
+  "name": "particle-firebase-proxy",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jychuah/particle-firebase-proxy.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jychuah/particle-firebase-proxy/issues"
+  },
+  "homepage": "https://github.com/jychuah/particle-firebase-proxy#readme",
+  "dependencies": {
+    "body-parser": "^1.15.2",
+    "express": "^4.14.0",
+    "firebase": "^3.2.1",
+    "foreman": "^1.4.1",
+    "particle-api-js": "^5.3.0"
+  }
+}
