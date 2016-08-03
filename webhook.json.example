@@ -1,0 +1,12 @@
+{
+    "event": "fbsubscribe",
+    "url": "YOUR_PUBLIC_URL",
+    "requestType": "POST",
+    "json": {
+        "device_id": "{{PARTICLE_DEVICE_ID}}",
+        "access_token": "0123456789abcdef",
+        "event_type": "value",
+        "firebase_path": "/test"
+    },
+    "mydevices": true
+}
