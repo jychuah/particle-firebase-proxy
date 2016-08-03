@@ -1,10 +1,16 @@
 #!/bin/bash
 
 # A test script for trying out your firebase proxy
-HOST='YOUR_PROXY_HOST'      # if you launch it locally, it will be http://localhost:9000
+
+# Your reverse proxy host URL. If you launch it locally, it will be http://localhost:9000
+HOST='YOUR_PROXY_HOST'
+# The Particle.io device ID that will receive events
 DEVICE_ID='YOUR_DEVICE_ID'
+# The Particle.io access token for this device
 ACCESS_TOKEN='YOUR_PARTICLE_ACCESS_TOKEN'
-EVENT_TYPE='value'        # 'value', 'child_added', 'child_changed' or 'child_removed'
+# The Firebase event type. 'value', 'child_added', 'child_changed' or 'child_removed'
+EVENT_TYPE='value'
+# Your Firebase data path. For example, '/test/value' 
 FIREBASE_PATH='YOUR_FIREBASE_DATABASE_PATH'
 
 curl $HOST -H "Content-Type: application/json" -X POST -d @- <<EOF
