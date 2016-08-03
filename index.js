@@ -1,4 +1,3 @@
-
 var throng = require('throng');
 var express = require('express');
 var bodyParser = require('body-parser');
@@ -35,6 +34,8 @@ function start() {
         res.status(400).send("Invalid Firebase event_type: " + body.event_type);
       }
 
+      console.log("Received request from " + body.device_id);
+
       // Try to get an event stream for the device, using provided device_id and access_token
       var devicesPr = particle.getEventStream({ deviceId : body.device_id, auth: body.access_token });
       devicesPr.then(
@@ -65,7 +66,8 @@ function start() {
               databaseURL: process.env.DATABASE,
               serviceAccount: process.env.SERVICEACCOUNTFILE,
               databaseAuthVariableOverride: {
-                device_id : body.device_id
+                device_id : body.device_id,
+                uid : process.env.FIREBASE_UID
               }
             }, body.device_id);
           }
@@ -73,12 +75,9 @@ function start() {
 
           // The app only has access as defined in the Security Rules
           var db = fb.database();
-
           var ref = db.ref(body.firebase_path);
-
           var promise = ref.once('value',
             function(snapshot) {
-              // console.log("Successfully retrieved value at path: ", snapshot.val());
               // no errors in retrieving value -- kludge in absence of ref.on success feedback
               // go ahead and attach event listener
               ref.on(body.event_type,

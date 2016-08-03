@@ -1,7 +1,7 @@
 {
   "name": "particle-firebase-proxy",
-  "version": "1.0.0",
-  "description": "",
+  "version": "0.0.1",
+  "description": "A reverse proxy that subscribes to Firebase events and publishes them as Particle.io events",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -10,8 +10,8 @@
     "type": "git",
     "url": "git+https://github.com/jychuah/particle-firebase-proxy.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["particle", "spark", "firebase"],
+  "author": "jychuah@gmail.com",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/jychuah/particle-firebase-proxy/issues"
@@ -24,5 +24,8 @@
     "foreman": "^1.4.1",
     "particle-api-js": "^5.3.0",
     "throng": "^4.0.0"
+  },
+  "scripts" : {
+    "start" : "nf start"
   }
 }
