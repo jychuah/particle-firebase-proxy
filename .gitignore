@@ -2,4 +2,3 @@ dev_test.sh
 node_modules
 dev.env
 npm_debug.log
-serviceAccount.json
