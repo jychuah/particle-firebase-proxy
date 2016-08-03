@@ -35,10 +35,12 @@ function start() {
         res.status(400).send("Invalid Firebase event_type: " + body.event_type);
       }
 
-      // check access token
+      // Try to get an event stream for the device, using provided device_id and access_token
       var devicesPr = particle.getEventStream({ deviceId : body.device_id, auth: body.access_token });
       devicesPr.then(
+        // On successful stream
         function(stream) {
+          // save stream
           particleStreams[body.device_id] = stream;
           stream.on('event', function(data) {
             // if device went offline, end streams, delete firebase app, delete references
@@ -56,7 +58,8 @@ function start() {
             }
           });
 
-          // successfully got device, attach Firebase listener
+          // Now that we have a Particle.io event stream for the device,
+          // go ahead and grab the requested Firebase event stream
           if (!firebaseApps.hasOwnProperty(body.device_id)) {
             firebaseApps[body.device_id] = firebase.initializeApp({
               databaseURL: process.env.DATABASE,
@@ -112,11 +115,11 @@ function start() {
           );
 
         },
+        // On unsuccessful stream
         function(error) {
           // Couldn't validate device_id and access_token
           // console.log(error);
           delete particleStreams[body.device_id];
-
           res.status(error.statusCode);
           res.send(error.body.error);
         }
