@@ -3,6 +3,23 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var firebase = require('firebase');
 var Particle = require('particle-api-js');
+var fs = require('fs');
+
+if (!process.env.DATABASE) {
+  console.log("No DATABASE environment variable specified!");
+  process.exit();
+}
+
+if (!process.env.SERVICEACCOUNTFILE) {
+  console.log("No SERVICEACCOUNTFILE environment variable specified!");
+}
+
+try {
+  stats = fs.lstatSync(process.env.SERVICEACCOUNTFILE);
+} catch(error) {
+  console.log("Couldn't open " + process.env.SERVICEACCOUNTFILE);
+  process.exit();
+}
 
 var WORKERS = process.env.WEB_CONCURRENCY || 1;
 
@@ -15,6 +32,8 @@ function start() {
 
   var firebaseApps = { };
   var particleStreams = { };
+
+  console.log("Environment: ", process.env);
 
   app.post('/', function(req, res, next) {
     try {
