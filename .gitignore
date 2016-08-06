@@ -2,3 +2,6 @@ dev_test.sh
 node_modules
 dev.env
 npm_debug.log
+dev.event_test.sh
+dev.rest_test.sh
+mototrack-ec5969406313.json
