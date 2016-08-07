@@ -1,12 +1,6 @@
 {
-    "event": "fbsubscribe",
-    "url": "YOUR_PUBLIC_URL",
-    "requestType": "POST",
-    "json": {
-        "device_id": "{{PARTICLE_DEVICE_ID}}",
-        "access_token": "0123456789abcdef",
-        "event_type": "value",
-        "firebase_path": "/test"
-    },
+    "event": "value",
+    "url": "https://myproxy.internet.com/my/data?device_id={{PARTICLE_DEVICE_ID}}&particle_token=01234567890abcdef&event_type=value",
+    "requestType": "GET",
     "mydevices": true
 }
