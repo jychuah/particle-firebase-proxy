@@ -183,7 +183,7 @@ function start() {
 
   function get(req, res, next) {
     app.use(orderBy);
-
+    app.use(otherQueries);
   }
 
   function put(req, res, next) {
@@ -217,11 +217,33 @@ function start() {
 
   function orderBy(req, res, next) {
     if (req.query.orderBy) {
-      switch (req.query.orderBy) {
-        case "$key" : res.ref = res.ref.orderByKey(); break;
-        case "$value" : res.ref = res.ref.orderByValue(); break;
-        case "$priority" : res.ref = res.ref.orderByPriority(); break;
-        default : res.ref = res.ref.orderByChild(req.query.orderBy); break;
+      try {
+        switch (req.query.orderBy) {
+          case "$key" : res.ref = res.ref.orderByKey(); break;
+          case "$value" : res.ref = res.ref.orderByValue(); break;
+          case "$priority" : res.ref = res.ref.orderByPriority(); break;
+          default : res.ref = res.ref.orderByChild(req.query.orderBy); break;
+        }
+      } catch (error) {
+        res.status(400).send("Invalid orderBy value");
+      }
+    }
+    next();
+  }
+
+  function otherQueries(req, res, next) {
+    for (var key in req.query) {
+      try {
+        switch(key) {
+          case "startAt" : res.ref = res.ref.startAt(req.query.startAt); break;
+          case "endAt" : res.ref = res.ref.endAt(req.query.endAt); break;
+          case "equalTo" : res.ref = res.ref.equalTo(req.query.endAt); break;
+          case "limitToFirst" : res.ref = res.ref.limitToFirst(req.query.limitToFirst); break;
+          case "limitToLast" : res.ref = res.ref.limitToLast(req.query.limitToLast); break;
+        }
+      } catch (error) {
+        res.status(400).send("Invalid parameter for query " + key);
+        res.end();
       }
     }
     next();
