@@ -184,6 +184,10 @@ function start() {
   function get(req, res, next) {
     app.use(orderBy);
     app.use(otherQueries);
+    app.use(doGet);
+    app.use(shallow);
+    app.use(returnGet);
+    next();
   }
 
   function put(req, res, next) {
@@ -207,22 +211,31 @@ function start() {
   }
 
   function unsupported(req, res, next) {
-
+    res.status(405).send("Method not allowed");
   }
 
   function startQuery(req, res, next) {
-    res.ref = firebaseApps[device_id].database().ref(stripDotJson(req.path));
+    res.ref = firebaseApps[req.query.device_id].database().ref(stripDotJson(req.path));
     next();
+  }
+
+  function stripQuotes(word) {
+    if (word.charAt(0) == '"' && word.charAt(word.length - 1) == '"') {
+      return word.substring(1, word.length - 1);
+    } else {
+      return word;
+    }
   }
 
   function orderBy(req, res, next) {
     if (req.query.orderBy) {
+      var order = stripQuotes(req.query.orderBy);
       try {
-        switch (req.query.orderBy) {
+        switch (order) {
           case "$key" : res.ref = res.ref.orderByKey(); break;
           case "$value" : res.ref = res.ref.orderByValue(); break;
           case "$priority" : res.ref = res.ref.orderByPriority(); break;
-          default : res.ref = res.ref.orderByChild(req.query.orderBy); break;
+          default : res.ref = res.ref.orderByChild(order); break;
         }
       } catch (error) {
         res.status(400).send("Invalid orderBy value");
@@ -231,17 +244,61 @@ function start() {
     next();
   }
 
+  function doGet(req, res, next) {
+    if (!res.ref) {
+      res.status(500).send("Something went really wrong.");
+      res.end();
+    } else {
+      res.ref.once('value', 
+        function(snapshot) {
+          res.key = snapshot.key;
+          res.val = snapshot.val();
+          next();
+        }, 
+        function(error) {
+          res.status(500).send("Error performing GET: " + error);
+          res.end();
+        }
+      );
+    }
+  }
+
+  function shallow(req, res, next) {
+    if (req.query.shallow == true || req.query.shallow == "true") {
+      for (var key in res.val) {
+        if (res.val[key] instanceof Object) {
+          res.val[key] = true;
+        }
+      }
+    }
+    next();
+  }
+
+  function returnGet(req, res, next) {
+    res.setHeader('Content-Type', 'application/json');
+    res.status(200);
+    res.send(res.val);
+    res.end();
+  }
+
   function otherQueries(req, res, next) {
     for (var key in req.query) {
+      var param = req.query[key];
+      if (!isNaN(parseFloat(param))) {
+        param = parseFloat(param);
+      } else {
+        param = stripQuotes(param);
+      }
       try {
         switch(key) {
-          case "startAt" : res.ref = res.ref.startAt(req.query.startAt); break;
-          case "endAt" : res.ref = res.ref.endAt(req.query.endAt); break;
-          case "equalTo" : res.ref = res.ref.equalTo(req.query.endAt); break;
-          case "limitToFirst" : res.ref = res.ref.limitToFirst(req.query.limitToFirst); break;
-          case "limitToLast" : res.ref = res.ref.limitToLast(req.query.limitToLast); break;
+          case "startAt" : res.ref = res.ref.startAt(param); break;
+          case "endAt" : res.ref = res.ref.endAt(param); break;
+          case "equalTo" : res.ref = res.ref.equalTo(param); break;
+          case "limitToFirst" : res.ref = res.ref.limitToFirst(param); break;
+          case "limitToLast" : res.ref = res.ref.limitToLast(param); break;
         }
       } catch (error) {
+        console.log("otherQueries error", error);
         res.status(400).send("Invalid parameter for query " + key);
         res.end();
       }
@@ -256,14 +313,15 @@ function start() {
 
     var method = req.query["x-http-method-override"] || req.method;
     switch(req.method) {
-      "GET" : app.use(get); break;
-      "PUT" : app.use(put); break;
-      "PATCH" : app.use(patch); break;
-      "UPDATE" : app.use(update); break;
-      "DELETE" : app.use(del); break;
-      "POST" : app.use(post); break;
+      case "GET" : app.use(get); break;
+      case "PUT" : app.use(put); break;
+      case "PATCH" : app.use(patch); break;
+      case "UPDATE" : app.use(update); break;
+      case "DELETE" : app.use(del); break;
+      case "POST" : app.use(post); break;
       default : app.use(unsupported); break;
     }
+    next();
   }
 
   app.use(verifyRequest);
