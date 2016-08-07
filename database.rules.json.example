@@ -1,7 +1,7 @@
 {
   "devices" : {
     "$device_id" : {
-      ".read" : "auth.device_id === $device_id && auth.uid === 'my-service-worker'"
+      ".read" : "auth.uid === $device_id"
     }
   }
 }
