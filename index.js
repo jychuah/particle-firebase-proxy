@@ -146,7 +146,7 @@ function start() {
 
   function dispatchEvent(req, snapshot) {
     var payload = { key : snapshot.key, val : snapshot.val() };
-    console.log({ name : req.event_type, data : payload, auth : req.query.particle_token, isPrivate : true });
+    particle.publishEvent({ name : req.event_type, data : payload, auth : req.query.particle_token, isPrivate : true });
   }
 
   function registerFirebaseEvent(req, res, next) {
