@@ -36,6 +36,7 @@ function start() {
 
   console.log("Environment: ", process.env);
 
+
   // Verify that request has device_id and particle_token query fields
   function verifyRequest(req, res, next) {
     var properties = ['device_id', 'particle_token']; 
@@ -51,7 +52,7 @@ function start() {
 
   function stripDotJson(path) {
     if (path.indexOf(".json") == path.length - 5) {
-      return path.substring(0, req.path.length - 5);
+      return path.substring(0, path.length - 5);
     }
     return path;
   }
@@ -191,23 +192,61 @@ function start() {
   }
 
   function put(req, res, next) {
-
+    res.ref.set(req.body, function(error) {
+      if (error) {
+        res.status(403).send("PUT Permission denied");
+      } else {
+        res.status(200).send("OK");
+      }
+    });
   }
 
   function patch(req, res, next) {
-
-  }
-
-  function update(req, res, next) {
-
+    res.ref.update(req.body, function(error) {
+      if (error) {
+        res.status(403).send("PATCH Permission denied");
+      } else {
+        res.ref.once('value', 
+          function(snapshot) {
+            res.status(200).send(snapshot.val());
+          },
+          function(error) {
+            res.status(204).send("PATCH successful, but could not retrieve values.");
+          }
+        );
+      }
+    });
   }
 
   function del(req, res, next) {
-
+    res.ref.remove().then(
+      function() {
+        res.status(200).send("OK");
+      }
+    ).catch(
+      function(error) {
+        console.log(error);
+        res.status(403).send("DELETE Permission denied");
+      }
+    )
   }
 
   function post(req, res, next) {
-
+    try {
+      var newRef = res.ref.push(req.body);
+      newRef.then(
+        function() {
+          res.status(200).send(newRef.key);
+        }
+      ).catch(
+        function(error) {
+          res.status(403).send("POST Permission denied");
+        }
+      )
+    } catch(error) {
+      res.status(400).send("POST data contains invalid key or value");
+      res.end();
+    }
   }
 
   function unsupported(req, res, next) {
@@ -256,7 +295,7 @@ function start() {
           next();
         }, 
         function(error) {
-          res.status(500).send("Error performing GET: " + error);
+          res.status(403).send("GET Permission denied");
           res.end();
         }
       );
@@ -316,7 +355,6 @@ function start() {
       case "GET" : app.use(get); break;
       case "PUT" : app.use(put); break;
       case "PATCH" : app.use(patch); break;
-      case "UPDATE" : app.use(update); break;
       case "DELETE" : app.use(del); break;
       case "POST" : app.use(post); break;
       default : app.use(unsupported); break;
