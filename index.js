@@ -157,7 +157,7 @@ function start() {
     ref.on(req.query.event_type, function(snapshot) {
       dispatchEvent(req, snapshot);
     }, function(error) {
-      particle.publishEvent({ name : "cancel", auth : req.query.particle_token, isPrivate : true });
+      particle.publishEvent({ name : "cancel", data : error, auth : req.query.particle_token, isPrivate : true });
     });
     res.status(200).send("OK");
   }
