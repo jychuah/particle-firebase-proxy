@@ -1,7 +1,7 @@
 {
   "name": "particle-firebase-proxy",
-  "version": "0.0.1",
-  "description": "A reverse proxy that subscribes to Firebase events and publishes them as Particle.io events",
+  "version": "0.0.2",
+  "description": "A proxy/reverse-proxy that provides access to Firebase Database REST endpoints and Realtime Database events and publishes them as Particle.io events",
   "main": "index.js",
   "scripts": {
     "start": "nf start"
