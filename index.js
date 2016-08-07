@@ -38,10 +38,9 @@ function start() {
 
   // Verify that request has device_id and particle_token query fields
   function verifyRequest(req, res, next) {
-    var body = req.query;
     var properties = ['device_id', 'particle_token']; 
     for (var index in properties) {
-      if (!body.hasOwnProperty(properties[index])) {
+      if (!req.query.hasOwnProperty(properties[index])) {
         res.status(400).send("Missing property: " + properties[index]);
         res.end();
         return;
@@ -62,14 +61,13 @@ function start() {
   // Also, if the device ever goes offline, dispose of the event stream
   function verifyParticle(req, res, next) {
     var device_id = req.query.device_id;
-
-    var devicesPr = particle.getEventStream({ deviceId : req.query.device_id, auth: req.query.particle_token });
+    var devicesPr = particle.getEventStream({ deviceId : device_id, auth: req.query.particle_token });
     devicesPr.then(
       function(stream) {
        if (particleStreams[device_id]) {
             particleStreams[device_id].end();
         }
-        particleStreams[req.query.device_id] = stream;
+        particleStreams[device_id] = stream;
         stream.on('event', function(data) {
             // if device went offline, end streams, delete firebase app, delete references
             if (data.data === 'offline') {
@@ -106,22 +104,25 @@ function start() {
     var device_id = req.query.device_id;
     if (firebaseApps[device_id]) {
       firebaseApps[device_id].delete().then(function() {
+        delete firebaseApps[device_id];
         next();
       });
+    } else {
+      next();
     }
-    next();
   }
 
-  function initFirebaseApp(req, res, next) {
+  function initFirebaseApp(req, res, next) { 
     var device_id = req.query.device_id;
-    firebaseApps[device_id] = firebase.initializeApp({
-      databaseURL: process.env.DATABASE,
-      serviceAccount: process.env.SERVICEACCOUNTFILE,
-      databaseAuthVariableOverride: {
-        device_id : device_id,
-        uid : process.env.FIREBASE_UID
-      }
-    }, device_id);
+    if (!firebaseApps.hasOwnProperty(device_id)) {
+      firebaseApps[device_id] = firebase.initializeApp({
+        databaseURL: process.env.DATABASE,
+        serviceAccount: process.env.SERVICEACCOUNTFILE,
+        databaseAuthVariableOverride: {
+          uid : device_id
+        }
+      }, device_id);
+    }
     next();
   }
 
@@ -142,182 +143,121 @@ function start() {
     );
   }
 
-  function dispatchEvent(req, path, data) {
-    var payload = { path : path, data : data };
-    console.log({ name : "put", data : payload, auth : req.query.particle_token, isPrivate : true });
+  function dispatchEvent(req, snapshot) {
+    var payload = { key : snapshot.key, val : snapshot.val() };
+    console.log({ name : req.event_type, data : payload, auth : req.query.particle_token, isPrivate : true });
   }
 
-  function registerFirebaseEvents(req, res, next) {
+  function registerFirebaseEvent(req, res, next) {
     var device_id = req.query.device_id;
     var fb = firebaseApps[device_id];
     var ref = fb.database().ref(stripDotJson(req.path));
-    ref.on('value', function(snapshot) {
-      console.log("value event");
-      if ("/" + snapshot.key === req.path) {
-        dispatchEvent(req, "/", snapshot.val());
-      }
-    });
-    ref.on('child_changed', 
-      function(snapshot) {
-        console.log("child_changed event");
-        dispatchEvent(req, "/" + snapshot.key, snapshot.val());
-      },
-      function(error) {
 
-      }
-    );
+    ref.on(req.query.event_type, function(snapshot) {
+      dispatchEvent(req, snapshot);
+    });
     res.status(200).send("OK");
+  }
+
+  function checkEventType(req, res, next) {
+    var types = ['value', 'child_added', 'child_changed', 'child_removed'];
+    if (types.indexOf(req.query.event_type) > -1) {
+      next();
+    } else {
+      res.status(400).send("Unrecognized event type: " + req.query.event_type);
+    }
   }
 
   // Process this request as an Event Stream
   function eventStream(req, res, next) {
+    if (!req.query.event_type) {
+      res.status(400).send("Missing property: event_type");
+    }
+    app.use(checkEventType);
     app.use(cleanFirebaseApp);
     app.use(initFirebaseApp);
     app.use(checkFirebaseAccess);
-    app.use(registerFirebaseEvents);
+    app.use(registerFirebaseEvent);
+    next();
+  }
+
+  function get(req, res, next) {
+    app.use(orderBy);
+
+  }
+
+  function put(req, res, next) {
+
+  }
+
+  function patch(req, res, next) {
+
+  }
+
+  function update(req, res, next) {
+
+  }
+
+  function del(req, res, next) {
+
+  }
+
+  function post(req, res, next) {
+
+  }
+
+  function unsupported(req, res, next) {
+
+  }
+
+  function startQuery(req, res, next) {
+    res.ref = firebaseApps[device_id].database().ref(stripDotJson(req.path));
+    next();
+  }
+
+  function orderBy(req, res, next) {
+    if (req.query.orderBy) {
+      switch (req.query.orderBy) {
+        case "$key" : res.ref = res.ref.orderByKey(); break;
+        case "$value" : res.ref = res.ref.orderByValue(); break;
+        case "$priority" : res.ref = res.ref.orderByPriority(); break;
+        default : res.ref = res.ref.orderByChild(req.query.orderBy); break;
+      }
+    }
     next();
   }
 
   // Process this request as a REST operation
   function restOperation(req, res, next) {
-    console.log("rest operation");
-    console.log("body", req.body);
-    res.status(200);
-    res.send("OK rest operation");
-    res.end();
+    app.use(initFirebaseApp);
+    app.use(startQuery);
+
+    var method = req.query["x-http-method-override"] || req.method;
+    switch(req.method) {
+      "GET" : app.use(get); break;
+      "PUT" : app.use(put); break;
+      "PATCH" : app.use(patch); break;
+      "UPDATE" : app.use(update); break;
+      "DELETE" : app.use(del); break;
+      "POST" : app.use(post); break;
+      default : app.use(unsupported); break;
+    }
   }
 
-  
   app.use(verifyRequest);
   app.use(verifyParticle);
-
 
   // Decide if the request is an event stream request or a REST operation,
   // and use the appropriate route.
   app.all('*', function(req, res, next) {
-    var accept = req.get("Accept");
-    if (accept === "text/event-stream" && req.method === "GET") {
+    if (req.query.event_type && req.method === "GET") {
       app.use(eventStream);
     } else {
       app.use(restOperation);
     }
     next();
   });
-  /*
   
-  app.post('/', function(req, res, next) {
-    try {
-      var body = req.body;
-      // Verify request has all fields
-      var properties = ['device_id', 'access_token', 'event_type', 'firebase_path'];
-      for (var index in properties) {
-        if (!body.hasOwnProperty(properties[index])) {
-          res.status(400).send("Missing property: " + properties[index]);
-          return false;
-        }
-      }
-
-      // Very event types
-      var types = ['value', 'child_added', 'child_changed', 'child_removed', 'child_moved'];
-      if (!(types.indexOf(body.event_type) > -1)) {
-        res.status(400).send("Invalid Firebase event_type: " + body.event_type);
-      }
-
-      console.log("Received request from " + body.device_id);
-
-      // Try to get an event stream for the device, using provided device_id and access_token
-      var devicesPr = particle.getEventStream({ deviceId : body.device_id, auth: body.access_token });
-      devicesPr.then(
-        // On successful stream
-        function(stream) {
-          // save stream
-          particleStreams[body.device_id] = stream;
-          stream.on('event', function(data) {
-            // if device went offline, end streams, delete firebase app, delete references
-            if (data.data === 'offline') {
-              try {
-                particleStreams[body.device_id].end();
-                delete particleStreams[body.device_id];
-                firebaseApps[body.device_id].delete().then(function() {
-                  delete firebaseApps[body.device_id];
-                  console.log("Released resources for device: ", body.device_id);
-                });
-              } catch (error) {
-                console.error(error);
-              }
-            }
-          });
-
-          // Now that we have a Particle.io event stream for the device,
-          // go ahead and grab the requested Firebase event stream
-          if (!firebaseApps.hasOwnProperty(body.device_id)) {
-            firebaseApps[body.device_id] = firebase.initializeApp({
-              databaseURL: process.env.DATABASE,
-              serviceAccount: process.env.SERVICEACCOUNTFILE,
-              databaseAuthVariableOverride: {
-                device_id : body.device_id,
-                uid : process.env.FIREBASE_UID
-              }
-            }, body.device_id);
-          }
-          var fb = firebaseApps[body.device_id];
-
-          // The app only has access as defined in the Security Rules
-          var db = fb.database();
-          var ref = db.ref(body.firebase_path);
-          var promise = ref.once('value',
-            function(snapshot) {
-              // no errors in retrieving value -- kludge in absence of ref.on success feedback
-              // go ahead and attach event listener
-              ref.on(body.event_type,
-                function(snapshot) {
-                  // firebase event fired -- publish an event to the device with the data, could be null if bad path
-                  var payload = { };
-                  payload.key = snapshot.key;
-                  payload.firebase_path = body.firebase_path;
-                  payload.val = snapshot.val();
-                  payload.event_type = body.event_type;
-                  var privacy = body.isPrivate || false;
-                  var publishEventPr = particle.publishEvent({ name: "firebase", data: payload, auth: body.access_token, isPrivate : privacy });
-                },
-                function(error) {
-                  // cancel event -- publish something to the device
-                  var privacy = body.isPrivate || false;
-                  var publishEventPr = particle.publishEvent({ name: "firebase", data: error, auth: body.access_token, isPrivate : privacy });
-                }
-              );
-
-              // made it this far without exceptions, go ahead and send status 200
-              res.status(200).send("OK");
-            },
-            function(error) {
-              if (error.message.indexOf("permission_denied") > -1) {
-                // give a 403
-                // console.log("Permission Denied: ", error.message);
-                res.status(403).send("Firebase permission denied: " + error.message);
-                return;
-              }
-              res.status(503).send("Firebase error: " + error.message);
-              // unhandled error?
-            }
-          );
-
-        },
-        // On unsuccessful stream
-        function(error) {
-          // Couldn't validate device_id and access_token
-          // console.log(error);
-          delete particleStreams[body.device_id];
-          res.status(error.statusCode);
-          res.send(error.body.error);
-        }
-      );
-    } catch(error) {
-      res.status(500).send("Oops! An unhandled particle-firebase-proxy exception occurred: " + error);
-    }
-  });
-
-*/
   var server = app.listen(process.env.PORT || 9000, function() {
     console.log('Listening on port %d', server.address().port);
   });
