@@ -1,5 +1,5 @@
 {
-    "event": "value",
+    "event": "valueSub",
     "url": "https://myproxy.internet.com/my/data?device_id={{PARTICLE_DEVICE_ID}}&particle_token=01234567890abcdef&event_type=value",
     "requestType": "GET",
     "mydevices": true
