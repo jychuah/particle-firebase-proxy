@@ -68,15 +68,19 @@ The reverse-proxy will only store *one* event subscription at a time. A subseque
 
 ### Testing
 
-The [`./test.sh`](./test.sh) script can be used to try out your reverse proxy. Just fill in the variables and run the script. The script will print out the REST response. (If it says `OK` that's good.) Any events that happen on Firebase should now appear as published events and data on your Particle.io event stream, which you can view with the [Particle.io Console](http://console.particle.io).
+Two scripts are available for testing your proxy with `curl`. Fill in the necessary variables in the scripts to run them.
+
+The [`./tests/test_rest.sh`](./tests/test_rest.sh) script is included to test non-EventSource REST calls. You should receive an `OK` in the command line for `PUT` and `DELETE` calls, a keyname for any `POST` calls and JSON data for any `GET` calls.
+
+The ['./tests/test_events.sh'] script is included to test EventSource GET calls. You should receive an `OK` in the command line, with any events appearing in your [Particle.io Console](http://console.particle.io).
 
 ### Setting Up A Webhook
 
-It's a good idea to let your Particle.io device subscribe using a Webhook. [`webhook.json.example`](./webhook.json.example) has been included to illustrate a Webhook that passes the necessary data to your reverse proxy. That way, you can simply call...
+It's a good idea to let your Particle.io device interact with the proxy using Webhooks. [`./examples/webhook.json.example`](./examples/webhook.json.example) has been included to illustrate a Webhook that passes the necessary data to your proxy to subscribe to realtime database events. That way, you can simply call...
 
 ```
 Particle.subscribe("value", handlerFunction);
-Particle.publish("value");
+Particle.publish("valueSub");
 ```
 
 ...from within your device firmware.
@@ -87,7 +91,7 @@ When you setup your Webhook, you will want to [create a non-expiring Particle.io
 
 ### Firebase Database Security
 
-It's a good idea to [secure access to any Firebase Database paths](https://firebase.google.com/docs/database/security/) that you will access using the reverse proxy. The reverse proxy authenticates using your Service Account, with `auth.uid` set to your `device_id` query parameter. The provided [`database.rules.json.example`] demonstrates how to secure read access using `auth.uid`, limiting any authenticated device to reading its own `/device/device_id` path.
+It's a good idea to [secure access to any Firebase Database paths](https://firebase.google.com/docs/database/security/) that you will access using the reverse proxy. The reverse proxy authenticates using your Service Account, with `auth.uid` set to your `device_id` query parameter. The provided [`./examples/database.rules.json.example`](./examples/database.rules.json.example) demonstrates how to secure read access using `auth.uid`, limiting any authenticated device to reading its own `/device/device_id` path.
 
 ### Deploying to Heroku
 
@@ -97,6 +101,7 @@ I tested this reverse proxy on [Heroku](http://heroku.com). To setup Heroku, mak
 
 	```
 	git clone https://github.com/jychuah/particle-firebase-proxy
+	cd particle-firebase-proxy
 	```
 
 - Save your `serviceAccount.json` file in the root of your clone. Add it to your repo with:
@@ -131,14 +136,3 @@ I tested this reverse proxy on [Heroku](http://heroku.com). To setup Heroku, mak
 	```
 	heroku logs --tail
 	```
-
-### HTTP Error Messages
-
-Error message responses could be:
-
-- `(400) Missing property` in the request
-- `(400) Invalid Firebase event_type` if it wasn't one of the [Firebase database events](https://firebase.google.com/docs/database/web/retrieve-data#listen_for_events)
-- `(401) Unauthorized` if it couldn't validate the `device_id` and `access_token` pair 
-- `(403) Firebase permission denied` if the `firebase_path` was inaccessible
-- `(503) Firebase error` for other types of Firebase errors.
-- `(500) Oops!` for... well, submit a bug report.
