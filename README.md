@@ -59,6 +59,7 @@ The reverse-proxy will only store *one* event subscription at a time. A subseque
 	
 - Setup a Firebase App and some database access rules!
 - Setup a Google Service Account and download the credentials .json. Instructions for creating a service account for your Firebase App can be found [here](https://firebase.google.com/docs/server/setup), under the _Add Firebase to your app_ heading. Save this file in the root of your clone of this repo.
+- After adding the service account and downloading the credentials in the developer console, go to the IAM tab and add the service account as a Service Account Actor. (This isn't in the docs, but is a necessary step.)
 - Configure `DATABASE` and `SERVICEACCOUNTFILE` environment variables.
 	- `DATABASE` should be set to your Firebase database's URL. For example, `http://myfirebase.firebaseio.com`
 	- `SERVICEACCOUNTFILE` should be set to your service account.json file. For example, `serviceAccount.json`
