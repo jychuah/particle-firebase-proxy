@@ -145,9 +145,10 @@ function start() {
   }
 
   function dispatchEvent(req, snapshot) {
-    var payload = { key : snapshot.key, val : snapshot.val() };
+    var payload = { };
+    payload[snapshot.key] = snapshot.val();
     console.log("Publishing " + req.query.event_type + " for " + req.query.device_id);
-    particle.publishEvent({ name : req.query.event_type, data : payload, auth : req.query.particle_token, isPrivate : true });
+    particle.publishEvent({ name : req.query.event_type, data : JSON.stringify(payload), auth : req.query.particle_token, isPrivate : true });
   }
 
   function registerFirebaseEvent(req, res, next) {
