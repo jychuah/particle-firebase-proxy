@@ -146,7 +146,8 @@ function start() {
 
   function dispatchEvent(req, snapshot) {
     var payload = { key : snapshot.key, val : snapshot.val() };
-    particle.publishEvent({ name : req.event_type, data : payload, auth : req.query.particle_token, isPrivate : true });
+    console.log("Publishing " + req.query.event_type + " for " + req.query.device_id);
+    particle.publishEvent({ name : req.query.event_type, data : payload, auth : req.query.particle_token, isPrivate : true });
   }
 
   function registerFirebaseEvent(req, res, next) {
@@ -154,9 +155,13 @@ function start() {
     var fb = firebaseApps[device_id];
     var ref = fb.database().ref(stripDotJson(req.path));
 
+    console.log("Registering " + req.query.event_type + " for " + req.query.device_id);
+    console.log("query", req.query);
+
     ref.on(req.query.event_type, function(snapshot) {
       dispatchEvent(req, snapshot);
     }, function(error) {
+      console.log(req.query.event_type + " event canceled for " + req.query.device_id, error);
       particle.publishEvent({ name : "cancel", data : error, auth : req.query.particle_token, isPrivate : true });
     });
     res.status(200).send("OK");
@@ -165,32 +170,13 @@ function start() {
   function checkEventType(req, res, next) {
     var types = ['value', 'child_added', 'child_changed', 'child_removed'];
     if (types.indexOf(req.query.event_type) > -1) {
+      console.log('Event stream request for ' + req.query.device_id);
       next();
     } else {
-      res.status(400).send("Unrecognized event type: " + req.query.event_type);
+        console.log('REST request for ' + req.query.device_id);
+        next('route');
+        
     }
-  }
-
-  // Process this request as an Event Stream
-  function eventStream(req, res, next) {
-    if (!req.query.event_type) {
-      res.status(400).send("Missing property: event_type");
-    }
-    app.use(checkEventType);
-    app.use(cleanFirebaseApp);
-    app.use(initFirebaseApp);
-    app.use(checkFirebaseAccess);
-    app.use(registerFirebaseEvent);
-    next();
-  }
-
-  function get(req, res, next) {
-    app.use(orderBy);
-    app.use(otherQueries);
-    app.use(doGet);
-    app.use(shallow);
-    app.use(returnGet);
-    next();
   }
 
   function put(req, res, next) {
@@ -347,36 +333,18 @@ function start() {
     next();
   }
 
-  // Process this request as a REST operation
-  function restOperation(req, res, next) {
-    app.use(initFirebaseApp);
-    app.use(startQuery);
-
-    var method = req.query["x-http-method-override"] || req.method;
-    switch(req.method) {
-      case "GET" : app.use(get); break;
-      case "PUT" : app.use(put); break;
-      case "PATCH" : app.use(patch); break;
-      case "DELETE" : app.use(del); break;
-      case "POST" : app.use(post); break;
-      default : app.use(unsupported); break;
-    }
-    next();
-  }
-
   app.use(verifyRequest);
   app.use(verifyParticle);
 
-  // Decide if the request is an event stream request or a REST operation,
-  // and use the appropriate route.
-  app.all('*', function(req, res, next) {
-    if (req.query.event_type && req.method === "GET") {
-      app.use(eventStream);
-    } else {
-      app.use(restOperation);
-    }
-    next();
-  });
+  // Trap for event stream requests and handle those first. If it's not an event stream request, then
+  // checkEventType will call a next('route') to bypass the rest of the middleware in this route
+  app.get('*', checkEventType, cleanFirebaseApp, initFirebaseApp, checkFirebaseAccess, registerFirebaseEvent);
+  
+  app.get('*', initFirebaseApp, startQuery, orderBy, otherQueries, doGet, shallow, returnGet);
+  app.put('*', initFirebaseApp, startQuery, put);
+  app.patch('*', initFirebaseApp, startQuery, patch);
+  app.delete('*',  initFirebaseApp, startQuery,del);
+  app.post('*',  initFirebaseApp, startQuery, post);
   
   var server = app.listen(process.env.PORT || 9000, function() {
     console.log('Listening on port %d', server.address().port);
